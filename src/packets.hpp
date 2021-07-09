@@ -27,6 +27,13 @@ protected:
     json data;
 };
 
+class OverlayKeyOutP : public OutPacket {
+public:
+    OverlayKeyOutP();
+
+    virtual json getJSON();
+};
+
 class ConfigInP : public InPacket {
 public:
     ConfigInP(std::string str);

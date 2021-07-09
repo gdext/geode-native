@@ -19,3 +19,9 @@ ConfigInP::ConfigInP(std::string str) : ConfigInP(json::parse(str)) {}
 ConfigInP::ConfigInP(json data) : InPacket(data) {
     overlay_key = data["overlay_key"].get<int>();
 }
+
+OverlayKeyOutP::OverlayKeyOutP() : OutPacket("overlay_key") {}
+
+json OverlayKeyOutP::getJSON() {
+    return OutPacket::getJSON();
+}

@@ -1,39 +1,61 @@
 #include "overlay.hpp"
 #include "connection.hpp"
 #include "packets.hpp"
+#include "keyinput.hpp"
+
+#include "gd.hpp"
+
+ConfigInP* current_config = nullptr;
+Connection* connection;
 
 void on_packet(json data) {
     auto ptype = data["type"].get<std::string>();
 
-    if (ptype == "config") {
-        ConfigInP p(data);
+    if (ptype == "config")
+        current_config = new ConfigInP(data);
+}
 
-        MessageBoxA(NULL, (std::string("overlay_key: ") + std::to_string(p.overlay_key)).c_str(),"Packet Recieved: CONFIG", MB_ICONINFORMATION);
-    }
+std::string getWindowTitle(HWND hwnd) {
+    char title[101];
+    GetWindowTextA(hwnd, title, 100);
+
+    title[100] = 0;
+    return std::string(title);
+}
+
+void keyInput(DWORD scancode) {
+    if (current_config != nullptr && scancode == current_config->overlay_key)
+        if (GetForegroundWindow() == gd::window)
+            connection->send(new OverlayKeyOutP());
 }
 
 DWORD WINAPI load_thread(LPVOID hModule) {
     auto o = Overlay::startFromCommand("\"C:\\Users\\Hakim\\Documents\\GitHub\\geode-app\\native-run.bat\"");
 
-    Connection* con;
-    for (int i = 0; i < 10; i++) {
-        con = Connection::connect(3264);
+    for (int i = 0; i < 20; i++) {
+        connection = Connection::connect(3264);
 
-        if (con != nullptr) break;
+        if (connection != nullptr) break;
+        Sleep(500);
     }
 
-    if (con == nullptr) {
+    if (connection == nullptr) {
         MessageBoxA(NULL, "The Geode mod could not connect to the overlay.", "Connection error!", MB_ICONERROR);
         return 0;
     }
 
-    con->onPacket = on_packet;
+    connection->onPacket = on_packet;
 
-    if (con == nullptr) return 0;
+    if (connection == nullptr) return 0;
+
+    keyinput::onKeyInput = keyInput;
+    keyinput::init();
+
+    gd::waitForGDWindow();
 
     while (true) {
         Sleep(10);
-        con->check_for_data();
+        connection->check_for_data();
     }
 
     return 0;

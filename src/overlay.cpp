@@ -59,8 +59,6 @@ Overlay* Overlay::startFromCommand(std::string command) {
         return nullptr;
     }
 
-    WaitForSingleObject( pi.hProcess, INFINITE );
-
     CloseHandle( pi.hProcess );
     CloseHandle( pi.hThread );
 
