@@ -1,0 +1,1 @@
+msbuild build/GeodeNative.sln /p:Configuration=Release /p:PlatformTarget=x86 /m
