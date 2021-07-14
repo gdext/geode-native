@@ -26,13 +26,14 @@ bool Connection::send(const char* data, size_t size) {
 }
 
 bool Connection::send(std::string str) {
-    char* buffer = new char[str.length() + 4];
-    *((unsigned int*)buffer) = str.length();
+    char* buffer = new char[str.length() + 1];
 
     for (int i = 0; i < str.length(); i++)
-        buffer[i + 4] = str[i];
+        buffer[i] = str[i];
 
-    bool success = send(buffer, str.length() + 4);
+    buffer[str.length()] = 0x17;
+
+    bool success = send(buffer, str.length() + 1);
     delete buffer;
 
     return success;
@@ -42,51 +43,45 @@ bool Connection::send(OutPacket* packet) {
     send(packet->getJSONString());
 }
 
-void Connection::add_bytes_to_data(char* data, unsigned int size) {
-    unsigned int av_space   = packet_size - current_size;
-    unsigned int added_data = size > av_space ? av_space : size;
-
-    memcpy(current_data + current_size, data, added_data);
-
-    current_size += added_data;
-}
-
 bool Connection::check_for_data() {
     size_t avalible_bytes = socket->available();
     if (avalible_bytes == 0) return true;
 
-    char* new_data = new char[avalible_bytes];
+    std::vector<char> new_data(avalible_bytes);
 
     int offset = 0;
 
     asio::error_code ec;
 
-    socket->read_some(asio::buffer(new_data, avalible_bytes), ec);
+    socket->read_some(asio::buffer(new_data.data(), new_data.size()), ec);
 
-    if (ec) {
-        delete new_data;
+    if (ec)
         return false;
-    }
 
-    if (!got_packet_header && avalible_bytes >= 4) {
-        packet_size = *(unsigned int*)new_data;
+    std::stringstream ss;
+    for(int i = 0; i < new_data.size(); i++)
+        ss << std::hex << (int) new_data[i] << " ";
 
-        got_packet_header = true;
+    current_data.insert(current_data.end(), new_data.begin(), new_data.end());
 
-        current_data = new char[packet_size];
-        current_size = 0;
+    std::vector<char> replacement;
 
-        offset += 4;
-    }
+    bool success = true;
+    while (success) {
+        success = false;
+        for (int i = 0; i < current_data.size(); i++) {
+            if (current_data[i] == 0x17) {
+                std::string str(current_data.data(), i);
+                if (onPacket != 0) onPacket(json::parse(str));
 
-    if (avalible_bytes - offset > 0) {
-        add_bytes_to_data(new_data + offset, avalible_bytes - offset);
+                for (int j = i + 1; j < current_data.size(); j++)
+                    replacement.push_back(current_data[j]);
 
-        if (current_size >= packet_size) {
-            std::string str(current_data, packet_size);
-
-            if (onPacket != 0) onPacket(json::parse(str));
-            got_packet_header = false;
+                current_data = replacement;
+                replacement.clear();
+                success = true;
+                break;
+            }
         }
     }
 }

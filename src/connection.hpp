@@ -35,11 +35,8 @@ private:
     asio::ip::tcp::endpoint* endpoint;
     asio::ip::tcp::socket*   socket;
 
-    char* current_data;
-    unsigned int current_size;
+    std::vector<char> current_data;
 
     bool got_packet_header;
     unsigned int packet_size;
-
-    void add_bytes_to_data(char* data, unsigned int size);
 };

@@ -5,14 +5,42 @@
 
 #include "gd.hpp"
 
+#include <shlobj.h>
+
 ConfigInP* current_config = nullptr;
 Connection* connection;
+
+extern "C" void __declspec(dllexport) GEODE_RequiredImport() {}
 
 void on_packet(json data) {
     auto ptype = data["type"].get<std::string>();
 
     if (ptype == "config")
         current_config = new ConfigInP(data);
+    
+    if (ptype == "modlist") {
+        ModListInP packet(data);
+
+        current_modlist = packet.modlist;
+    }
+
+    if (ptype == "modload") {
+        ModLoadInP packet(data);
+
+        if (current_modlist != nullptr)
+            connection->send(new ModLoadedOutP(packet.mod, current_modlist->loadMod(packet.mod)));
+        else
+            connection->send(new ModLoadedOutP(packet.mod, false));
+    }
+
+    if (ptype == "modunload") {
+        ModUnloadInP packet(data);
+
+        if (current_modlist != nullptr)
+            connection->send(new ModUnloadedOutP(packet.mod, current_modlist->unloadMod(packet.mod)));
+        else
+            connection->send(new ModUnloadedOutP(packet.mod, false));
+    }
 }
 
 std::string getWindowTitle(HWND hwnd) {
@@ -30,7 +58,10 @@ void keyInput(DWORD scancode) {
 }
 
 DWORD WINAPI load_thread(LPVOID hModule) {
-    auto o = Overlay::startFromCommand("\"C:\\Users\\Hakim\\Documents\\GitHub\\geode-app\\native-run.bat\"");
+    CHAR my_documents[MAX_PATH];
+    HRESULT result = SHGetFolderPathA(NULL, CSIDL_PERSONAL, NULL, SHGFP_TYPE_CURRENT, my_documents);
+
+    auto o = Overlay::startFromCommand("\"" + std::string(my_documents) + "\\GitHub\\geode-app\\native-run.bat\"");
 
     for (int i = 0; i < 20; i++) {
         connection = Connection::connect(3264);
